@@ -2,7 +2,7 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <h1>
-        <img :src="`${import.meta.env.BASE_URL}train.png`" alt="" class="title-icon">
+        <img :src="trainIconPath" alt="" class="title-icon">
         Rotas Ferroviárias - Brasil
       </h1>
       <p>Encontre a melhor rota entre as extensões ferroviárias do Brasil</p>
@@ -169,6 +169,7 @@ const store = useGlobalStore()
 const cidades = ref([])
 const loadingCidades = ref(false)
 const rotaResultado = computed(() => store.rotaAtual)
+const trainIconPath = `${import.meta.env.BASE_URL}train.png`
 
 async function carregarCidades() {
   loadingCidades.value = true
