@@ -10,13 +10,8 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
-  // Usa a variável de ambiente VITE_API_URL (do secret do GitHub)
-  // Fallback para localhost em desenvolvimento
-  define: {
-    'import.meta.env.VITE_API_URL': JSON.stringify(
-      process.env.VITE_API_URL || 'http://localhost:8000'
-    )
-  },
+  // Vite processa automaticamente variáveis de ambiente que começam com VITE_
+  // Defina VITE_API_URL no ambiente de build para produção
   server: {
     port: 5173,
     proxy: {

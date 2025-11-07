@@ -150,7 +150,8 @@ async function handleBuscarRota() {
   } catch (error) {
     console.error('Erro ao buscar rota:', error)
     
-    if (error.isConnectionError || (error.message && error.message.includes('Network Error'))) {
+    // Mostrar modal apenas em desenvolvimento
+    if (import.meta.env.DEV && (error.isConnectionError || (error.message && error.message.includes('Network Error')))) {
       modalErrorVisible.value = true
     } else if (error.response) {
       mostrarToast('error', 'Erro HTTP', `Erro HTTP: ${error.response.status} - ${error.response.statusText}`, 6000)
@@ -180,7 +181,8 @@ function handleLimparMapa() {
 }
 
 function handleApiError(error) {
-  if (error.isConnectionError || (error.message && error.message.includes('Network Error'))) {
+  // Mostrar modal de erro apenas em desenvolvimento
+  if (import.meta.env.DEV && (error.isConnectionError || (error.message && error.message.includes('Network Error')))) {
     if (!modalErrorVisible.value) {
       modalErrorVisible.value = true
     }
