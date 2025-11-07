@@ -3,6 +3,11 @@ import axios from 'axios'
 // Usar variável de ambiente ou fallback para localhost
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+if(API_BASE_URL === '') {
+  console.error('API_BASE_URL is empty')
+  throw new Error('API_BASE_URL is empty')
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
