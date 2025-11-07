@@ -1,10 +1,11 @@
 // Serviço para gerenciar IndexedDB
 const DB_NAME = 'LocomotivaDB'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 const STORES = {
   CIDADES: 'cidades',
-  COORDENADAS: 'coordenadas'
+  COORDENADAS: 'coordenadas',
+  LINHAS_FERROVIARIAS: 'linhas_ferroviarias'
 }
 
 let db = null
@@ -37,6 +38,11 @@ export async function initDB() {
       if (!db.objectStoreNames.contains(STORES.COORDENADAS)) {
         const coordenadasStore = db.createObjectStore(STORES.COORDENADAS, { keyPath: 'cidade' })
         coordenadasStore.createIndex('cidade', 'cidade', { unique: true })
+      }
+      
+      // Store para linhas ferroviárias (GeoJSON)
+      if (!db.objectStoreNames.contains(STORES.LINHAS_FERROVIARIAS)) {
+        db.createObjectStore(STORES.LINHAS_FERROVIARIAS, { keyPath: 'id' })
       }
     }
   })
@@ -251,11 +257,98 @@ export async function clearCoordenadasCache() {
   }
 }
 
+// Salvar linhas ferroviárias (GeoJSON)
+export async function saveLinhasFerroviarias(geojson) {
+  try {
+    const database = await getDB()
+    const transaction = database.transaction([STORES.LINHAS_FERROVIARIAS], 'readwrite')
+    const store = transaction.objectStore(STORES.LINHAS_FERROVIARIAS)
+    
+    return new Promise((resolve, reject) => {
+      const request = store.put({
+        id: 'linhas_ferroviarias',
+        geojson,
+        timestamp: Date.now()
+      })
+      
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => {
+        console.error('Erro ao salvar linhas ferroviárias no IndexedDB:', request.error)
+        reject(request.error)
+      }
+    })
+  } catch (error) {
+    console.error('Erro ao salvar linhas ferroviárias no IndexedDB:', error)
+    return false
+  }
+}
+
+// Obter linhas ferroviárias (GeoJSON)
+export async function getLinhasFerroviarias() {
+  try {
+    const database = await getDB()
+    const transaction = database.transaction([STORES.LINHAS_FERROVIARIAS], 'readonly')
+    const store = transaction.objectStore(STORES.LINHAS_FERROVIARIAS)
+    
+    return new Promise((resolve, reject) => {
+      const request = store.get('linhas_ferroviarias')
+      
+      request.onsuccess = () => {
+        const result = request.result
+        if (result && result.geojson) {
+          // Verificar se o cache não está muito antigo (7 dias - dados estáticos)
+          const cacheAge = Date.now() - result.timestamp
+          const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 dias
+          
+          if (cacheAge < maxAge) {
+            resolve(result.geojson)
+          } else {
+            // Cache expirado
+            resolve(null)
+          }
+        } else {
+          resolve(null)
+        }
+      }
+      
+      request.onerror = () => {
+        reject(request.error)
+      }
+    })
+  } catch (error) {
+    console.error('Erro ao obter linhas ferroviárias do IndexedDB:', error)
+    return null
+  }
+}
+
+// Limpar cache de linhas ferroviárias
+export async function clearLinhasFerroviariasCache() {
+  try {
+    const database = await getDB()
+    const transaction = database.transaction([STORES.LINHAS_FERROVIARIAS], 'readwrite')
+    const store = transaction.objectStore(STORES.LINHAS_FERROVIARIAS)
+    
+    return new Promise((resolve, reject) => {
+      const request = store.clear()
+      
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => {
+        console.error('Erro ao limpar cache de linhas ferroviárias:', request.error)
+        reject(request.error)
+      }
+    })
+  } catch (error) {
+    console.error('Erro ao limpar cache de linhas ferroviárias:', error)
+    return false
+  }
+}
+
 // Limpar todo o cache
 export async function clearAllCache() {
   try {
     await clearCidadesCache()
     await clearCoordenadasCache()
+    await clearLinhasFerroviariasCache()
     return true
   } catch (error) {
     console.error('Erro ao limpar todo o cache:', error)

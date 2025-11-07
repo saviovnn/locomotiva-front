@@ -9,7 +9,7 @@ import { ref, onMounted, watch, onUnmounted } from 'vue'
 import L from 'leaflet'
 import { useGlobalStore } from '../stores/globalStore'
 import { apiService } from '../services/api'
-import { getCoordenadas, saveCoordenadas } from '../services/indexedDB'
+import { getCoordenadas, saveCoordenadas, getLinhasFerroviarias, saveLinhasFerroviarias } from '../services/indexedDB'
 
 const store = useGlobalStore()
 const mapContainer = ref(null)
@@ -132,7 +132,17 @@ function adicionarLegendaMapa() {
 
 async function carregarLinhasFerroviarias() {
   try {
-    const geojson = await apiService.getLinhasFerroviarias()
+    // Tentar obter do IndexedDB primeiro
+    let geojson = await getLinhasFerroviarias()
+    
+    if (!geojson) {
+      // Se não tiver no cache, buscar da API
+      geojson = await apiService.getLinhasFerroviarias()
+      // Salvar no IndexedDB
+      if (geojson) {
+        await saveLinhasFerroviarias(geojson)
+      }
+    }
     
     L.geoJSON(geojson, {
       style: function (feature) {
