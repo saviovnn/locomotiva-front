@@ -2,7 +2,7 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <h1>
-        <img src="/train.png" alt="" class="title-icon">
+        <img :src="`${import.meta.env.BASE_URL}train.png`" alt="" class="title-icon">
         Rotas Ferroviárias - Brasil
       </h1>
       <p>Encontre a melhor rota entre as extensões ferroviárias do Brasil</p>
