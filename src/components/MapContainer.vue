@@ -18,6 +18,7 @@ let map = null
 let routeLayer = null
 let markersLayer = null
 let railwayLayer = null
+let legendControl = null
 
 const props = defineProps({
   rota: {
@@ -27,6 +28,10 @@ const props = defineProps({
   railwayVisible: {
     type: Boolean,
     default: true
+  },
+  sidebarOpen: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -36,12 +41,17 @@ onMounted(async () => {
   await initMap()
   await carregarLinhasFerroviarias()
   store.setMapReady(true)
+  
+  // Listener para redimensionamento da janela
+  window.addEventListener('resize', atualizarVisibilidadeControles)
 })
 
 onUnmounted(() => {
   if (map) {
     map.remove()
   }
+  // Remover listener
+  window.removeEventListener('resize', atualizarVisibilidadeControles)
 })
 
 watch(() => props.railwayVisible, (visible) => {
@@ -52,6 +62,10 @@ watch(() => props.railwayVisible, (visible) => {
       map.removeLayer(railwayLayer)
     }
   }
+})
+
+watch(() => props.sidebarOpen, () => {
+  atualizarVisibilidadeControles()
 })
 
 watch(() => props.rota, (novaRota) => {
@@ -82,11 +96,14 @@ async function initMap() {
   
   map.zoomControl.setPosition('bottomright')
   
-  adicionarLegendaMapa()
+  legendControl = adicionarLegendaMapa()
   
   routeLayer = L.layerGroup().addTo(map)
   markersLayer = L.layerGroup().addTo(map)
   railwayLayer = L.layerGroup().addTo(map)
+  
+  // Inicializar visibilidade dos controles
+  atualizarVisibilidadeControles()
 }
 
 function adicionarLegendaMapa() {
@@ -128,6 +145,39 @@ function adicionarLegendaMapa() {
   }
   
   legend.addTo(map)
+  return legend
+}
+
+function atualizarVisibilidadeControles() {
+  if (!map) return
+  
+  const isMobile = window.innerWidth <= 768
+  const shouldHide = isMobile && props.sidebarOpen
+  
+  // Esconder/mostrar controles de zoom
+  const zoomControl = map.zoomControl
+  if (zoomControl) {
+    const zoomContainer = zoomControl.getContainer()
+    if (zoomContainer) {
+      if (shouldHide) {
+        zoomContainer.style.display = 'none'
+      } else {
+        zoomContainer.style.display = ''
+      }
+    }
+  }
+  
+  // Esconder/mostrar legenda
+  if (legendControl) {
+    const legendContainer = legendControl.getContainer()
+    if (legendContainer) {
+      if (shouldHide) {
+        legendContainer.style.display = 'none'
+      } else {
+        legendContainer.style.display = ''
+      }
+    }
+  }
 }
 
 async function carregarLinhasFerroviarias() {
@@ -201,7 +251,98 @@ async function carregarLinhasFerroviarias() {
 }
 
 async function exibirRota(data) {
-  const { rota, cidades, conexoes } = data
+  // Extrair dados da estrutura correta
+  const rota = data.rota || data
+  let cidades = data.cidades || []
+  let conexoes = data.conexoes || []
+  
+  if (!rota) {
+    return
+  }
+  
+  // Se cidades está vazio mas temos o caminho, buscar coordenadas
+  if ((!cidades || cidades.length === 0) && rota.caminho && Array.isArray(rota.caminho)) {
+    try {
+      // Separar cidades que estão no cache das que não estão
+      const coordenadasCache = {}
+      const cidadesSemCache = []
+      
+      for (const cidadeNome of rota.caminho) {
+        const coords = await getCoordenadas(cidadeNome)
+        if (coords) {
+          coordenadasCache[cidadeNome] = coords
+        } else {
+          cidadesSemCache.push(cidadeNome)
+        }
+      }
+      
+      // Buscar coordenadas que não estão no cache
+      if (cidadesSemCache.length > 0) {
+        const coordenadasAPI = await apiService.getCoordenadasCidades(cidadesSemCache)
+        
+        // Adicionar ao cache
+        for (const coords of coordenadasAPI) {
+          const { nome, ...coordenadas } = coords
+          await saveCoordenadas(nome, coordenadas)
+          coordenadasCache[nome] = coordenadas
+        }
+      }
+      
+      // Criar array de cidades no formato esperado
+      cidades = rota.caminho.map(nome => {
+        const coords = coordenadasCache[nome]
+        if (coords) {
+          return {
+            nome: nome,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            uf: coords.uf,
+            municipio: coords.municipio
+          }
+        }
+        return null
+      }).filter(c => c !== null)
+      
+      // Se conexoes está vazio, criar a partir do caminho e coordenadas
+      if ((!conexoes || conexoes.length === 0) && cidades.length > 1) {
+        conexoes = []
+        for (let i = 0; i < cidades.length - 1; i++) {
+          const origem = cidades[i]
+          const destino = cidades[i + 1]
+          
+          // Calcular distância aproximada (Haversine)
+          const R = 6371 // Raio da Terra em km
+          const dLat = (destino.latitude - origem.latitude) * Math.PI / 180
+          const dLon = (destino.longitude - origem.longitude) * Math.PI / 180
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(origem.latitude * Math.PI / 180) * Math.cos(destino.latitude * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2)
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+          const distancia = R * c
+          
+          conexoes.push({
+            origem: origem.nome,
+            destino: destino.nome,
+            distancia: Math.round(distancia * 100) / 100,
+            coordenadas_origem: {
+              latitude: origem.latitude,
+              longitude: origem.longitude
+            },
+            coordenadas_destino: {
+              latitude: destino.latitude,
+              longitude: destino.longitude
+            }
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar coordenadas:', error)
+    }
+  }
+  
+  if (!cidades || !Array.isArray(cidades) || cidades.length === 0) {
+    return
+  }
   
   routeLayer.clearLayers()
   markersLayer.clearLayers()
@@ -268,7 +409,10 @@ async function exibirRota(data) {
   })
   
   // Adicionar linhas das conexões
-  conexoes.forEach(conexao => {
+  if (!conexoes || !Array.isArray(conexoes) || conexoes.length === 0) {
+    // Conexões inválidas ou ausentes, pulando desenho das linhas
+  } else {
+    conexoes.forEach(conexao => {
     const polyline = L.polyline([
       [conexao.coordenadas_origem.latitude, conexao.coordenadas_origem.longitude],
       [conexao.coordenadas_destino.latitude, conexao.coordenadas_destino.longitude]
@@ -282,7 +426,8 @@ async function exibirRota(data) {
       <strong>${conexao.origem}</strong> → <strong>${conexao.destino}</strong><br>
       Distância: ${conexao.distancia} km
     `)
-  })
+    })
+  }
   
   // Ajustar zoom para mostrar toda a rota
   if (cidades.length > 0) {
@@ -308,23 +453,46 @@ async function verTodasRotas(bitola) {
     
     const cidadesArray = Array.from(cidadesUnicas)
     
+    // Separar cidades que estão no cache das que não estão
+    const coordenadasCache = {}
+    const cidadesSemCache = []
+    
     for (const cidade of cidadesArray) {
-      // Tentar obter do IndexedDB primeiro
-      let coords = await getCoordenadas(cidade)
-      
-      if (!coords) {
-        try {
-          // Se não tiver no cache, buscar da API
-          coords = await apiService.getCoordenadasCidade(cidade)
-          if (coords) {
-            // Salvar no IndexedDB
-            await saveCoordenadas(cidade, coords)
-          }
-        } catch (error) {
-          console.warn(`Erro ao obter coordenadas para ${cidade}:`, error)
-          continue
-        }
+      const coords = await getCoordenadas(cidade)
+      if (coords) {
+        coordenadasCache[cidade] = coords
+      } else {
+        cidadesSemCache.push(cidade)
       }
+    }
+    
+    // Buscar todas as coordenadas que não estão no cache em uma única requisição
+    let coordenadasAPI = []
+    if (cidadesSemCache.length > 0) {
+      try {
+        coordenadasAPI = await apiService.getCoordenadasCidades(cidadesSemCache)
+        
+        // Salvar todas as coordenadas no IndexedDB
+        for (const coords of coordenadasAPI) {
+          // Extrair nome e criar objeto de coordenadas sem o nome
+          const { nome, ...coordenadas } = coords
+          await saveCoordenadas(nome, coordenadas)
+        }
+      } catch (error) {
+        console.error('Erro ao obter coordenadas múltiplas:', error)
+      }
+    }
+    
+    // Criar um mapa com todas as coordenadas (cache + API)
+    const todasCoordenadas = { ...coordenadasCache }
+    coordenadasAPI.forEach(coords => {
+      const { nome, ...coordenadas } = coords
+      todasCoordenadas[nome] = coordenadas
+    })
+    
+    // Criar marcadores para todas as cidades
+    for (const cidade of cidadesArray) {
+      const coords = todasCoordenadas[cidade]
       
       if (coords) {
         const marker = L.circleMarker([coords.latitude, coords.longitude], {

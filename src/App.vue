@@ -1,11 +1,36 @@
 <template>
   <div class="app-container">
-    <Sidebar />
+    <!-- Botão Hambúrguer (apenas mobile, escondido quando menu aberto) -->
+    <button 
+      v-if="!sidebarOpen"
+      class="hamburger-btn"
+      @click="toggleSidebar"
+      aria-label="Abrir menu"
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+    
+    <!-- Overlay escuro quando menu aberto em mobile -->
+    <div 
+      v-if="sidebarOpen"
+      class="sidebar-overlay"
+      @click="closeSidebar"
+    ></div>
+    
+    <Sidebar 
+      :is-open="sidebarOpen"
+      @close="closeSidebar"
+    />
     
     <MapContainer
       ref="mapContainerRef"
       :rota="store.rotaAtual"
       :railway-visible="store.railwayVisible"
+      :sidebar-open="sidebarOpen"
     />
     
     <!-- Toast -->
@@ -64,6 +89,15 @@ const toast = ref({
 
 const modalBitolaVisible = ref(false)
 const modalErrorVisible = ref(false)
+const sidebarOpen = ref(false)
+
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value
+}
+
+function closeSidebar() {
+  sidebarOpen.value = false
+}
 
 // Expor função para abrir modal de bitola globalmente
 window.abrirModalBitola = () => {
@@ -127,10 +161,16 @@ async function handleBuscarRota() {
     })
     
     if (data.sucesso) {
-      store.setRotaAtual(data)
+      // Salvar apenas os dados da rota no store (data.rota contém os dados principais)
+      store.setRotaAtual(data.rota)
       
       if (mapContainerRef.value) {
         mapContainerRef.value.exibirRota(data)
+      }
+      
+      // Fechar sidebar em mobile após buscar rota
+      if (window.innerWidth <= 768) {
+        closeSidebar()
       }
       
       mostrarToast('success', 'Rota Encontrada!', 'A rota foi calculada com sucesso.', 3000)
@@ -201,6 +241,97 @@ onMounted(() => {
   display: flex;
   height: 100vh;
   width: 100vw;
+  position: relative;
+}
+
+/* Botão Hambúrguer - apenas mobile */
+.hamburger-btn {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1001;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.hamburger-btn:hover {
+  background: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hamburger-btn svg {
+  color: #1e293b;
+}
+
+/* Overlay escuro quando menu aberto */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Responsividade para mobile */
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: block;
+  }
+  
+  /* Sidebar escondido por padrão em mobile */
+  :deep(.sidebar) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Sidebar aberto */
+  :deep(.sidebar.sidebar-open) {
+    transform: translateX(0);
+  }
+  
+  /* Overlay visível apenas quando sidebar aberto */
+  .sidebar-overlay {
+    display: block;
+  }
+}
+
+/* Desktop - comportamento normal */
+@media (min-width: 769px) {
+  .sidebar-overlay {
+    display: none !important;
+  }
+  
+  :deep(.sidebar) {
+    position: relative;
+    transform: translateX(0) !important;
+  }
 }
 </style>
 

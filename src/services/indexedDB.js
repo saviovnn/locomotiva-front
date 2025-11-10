@@ -95,9 +95,9 @@ export async function getCidades(bitola) {
       request.onsuccess = () => {
         const result = request.result
         if (result && result.cidades) {
-          // Verificar se o cache não está muito antigo (24 horas)
+          // Verificar se o cache não está muito antigo (30 dias - dados estáticos)
           const cacheAge = Date.now() - result.timestamp
-          const maxAge = 24 * 60 * 60 * 1000 // 24 horas
+          const maxAge = 30 * 24 * 60 * 60 * 1000 // 30 dias
           
           // Verificar se os dados parecem estar incompletos (apenas SP)
           // Se mais de 50% das cidades são de SP, provavelmente é cache antigo
@@ -108,7 +108,8 @@ export async function getCidades(bitola) {
           // (para bitola Larga esperamos ~851 cidades, Metrica ~1127)
           const isLikelyIncomplete = spPercentage > 50 && result.cidades.length < 500
           
-          if (cacheAge < maxAge && !isLikelyIncomplete) {
+          // Se o cache é válido e não está incompleto, sempre usar
+          if (cacheAge < maxAge && !isLikelyIncomplete && result.cidades.length > 0) {
             resolve(result.cidades)
           } else {
             // Cache expirado ou incompleto - limpar e buscar novamente

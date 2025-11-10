@@ -1,11 +1,24 @@
 <template>
-  <div class="sidebar">
+  <div class="sidebar" :class="{ 'sidebar-open': isOpen }">
     <div class="sidebar-header">
-      <h1>
-        <img :src="trainIconPath" alt="" class="title-icon">
-        Rotas Ferroviárias - Brasil
-      </h1>
-      <p>Encontre a melhor rota entre as extensões ferroviárias do Brasil</p>
+      <div class="header-content">
+        <h1>
+          <img :src="trainIconPath" alt="" class="title-icon">
+          Rotas Ferroviárias
+        </h1>
+        <p>Encontre a melhor rota entre as extensões ferroviárias</p>
+      </div>
+      <!-- Botão de fechar (apenas mobile) -->
+      <button 
+        class="close-btn"
+        @click="$emit('close')"
+        aria-label="Fechar menu"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
     </div>
     
     <div class="sidebar-content">
@@ -165,31 +178,64 @@ import { apiService } from '../services/api'
 import { getCidades, saveCidades } from '../services/indexedDB'
 import Button from './Button.vue'
 
+defineProps({
+  isOpen: {
+    type: Boolean,
+    default: false
+  }
+})
+
+defineEmits(['close'])
+
 const store = useGlobalStore()
 const cidades = ref([])
 const loadingCidades = ref(false)
 const rotaResultado = computed(() => store.rotaAtual)
 const trainIconPath = `${import.meta.env.BASE_URL}train.png`
 
+// Flag para evitar requisições duplicadas
+let carregandoCidades = false
+const cidadesCarregadas = new Set() // Rastrear quais bitolas já foram carregadas
+
 async function carregarCidades() {
+  // Se já está carregando, não fazer nova requisição
+  if (carregandoCidades) {
+    return
+  }
+  
+  // Se já tem cidades carregadas para esta bitola e não está vazio, usar cache
+  if (cidades.value.length > 0 && cidadesCarregadas.has(store.bitola)) {
+    const cached = await getCidades(store.bitola)
+    if (cached && cached.length > 0) {
+      return // Já tem dados carregados
+    }
+  }
+  
+  carregandoCidades = true
   loadingCidades.value = true
+  
   try {
     // Tentar obter do IndexedDB primeiro
     const cached = await getCidades(store.bitola)
-    if (cached) {
+    if (cached && cached.length > 0) {
       cidades.value = cached
+      cidadesCarregadas.add(store.bitola)
     } else {
-      // Se não tiver no cache, buscar da API
+      // Se não tiver no cache, buscar da API (apenas uma vez)
       const data = await apiService.getCidades(store.bitola)
-      cidades.value = data
-      // Salvar no IndexedDB
-      await saveCidades(store.bitola, data)
+      if (data && data.length > 0) {
+        cidades.value = data
+        cidadesCarregadas.add(store.bitola)
+        // Salvar no IndexedDB
+        await saveCidades(store.bitola, data)
+      }
     }
   } catch (error) {
     console.error('Erro ao carregar cidades:', error)
     store.setApiError(error)
   } finally {
     loadingCidades.value = false
+    carregandoCidades = false
   }
 }
 
@@ -220,8 +266,13 @@ function limparMapa() {
   store.triggerLimparMapa()
 }
 
-watch(() => store.bitola, () => {
-  carregarCidades()
+watch(() => store.bitola, async (newBitola, oldBitola) => {
+  // Só carregar se a bitola realmente mudou
+  if (newBitola !== oldBitola) {
+    // Limpar cidades anteriores
+    cidades.value = []
+    await carregarCidades()
+  }
 })
 
 onMounted(async () => {
@@ -243,6 +294,14 @@ onMounted(async () => {
   padding: 20px;
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.header-content {
+  flex: 1;
 }
 
 .sidebar-header h1 {
@@ -253,6 +312,28 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Botão de fechar (apenas mobile) */
+.close-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #64748b;
+  border-radius: 4px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.close-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.close-btn svg {
+  display: block;
 }
 
 .title-icon {
@@ -415,6 +496,28 @@ input:disabled {
 
 .city-stop {
   background: #3b82f6;
+}
+
+/* Responsividade mobile */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+  
+  .close-btn {
+    display: block;
+  }
+  
+  .sidebar-header h1 {
+    font-size: 16px;
+  }
+  
+  .sidebar-header p {
+    font-size: 12px;
+  }
 }
 </style>
 

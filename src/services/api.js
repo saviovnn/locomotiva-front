@@ -16,16 +16,63 @@ const api = axios.create({
   }
 })
 
+// Contador de requisições
+let requestCount = 0
+const requestLog = []
+
+// Interceptor para contar requisições
+api.interceptors.request.use(
+  (config) => {
+    requestCount++
+    const requestInfo = {
+      count: requestCount,
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      timestamp: new Date().toISOString()
+    }
+    requestLog.push(requestInfo)
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
 // Interceptor para tratamento de erros
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    return response
+  },
   (error) => {
     if (error.code === 'ECONNABORTED' || error.message.includes('Network Error')) {
       error.isConnectionError = true
     }
+    console.error(`[ERROR #${requestCount}] ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.message}`)
     return Promise.reject(error)
   }
 )
+
+// Função para obter estatísticas de requisições
+export function getRequestStats() {
+  const stats = {
+    total: requestCount,
+    byMethod: {},
+    byUrl: {},
+    log: requestLog
+  }
+  
+  requestLog.forEach(req => {
+    stats.byMethod[req.method] = (stats.byMethod[req.method] || 0) + 1
+    stats.byUrl[req.url] = (stats.byUrl[req.url] || 0) + 1
+  })
+  
+  return stats
+}
+
+// Expor função global para ver estatísticas
+if (typeof window !== 'undefined') {
+  window.getRequestStats = getRequestStats
+}
 
 export const apiService = {
   // Buscar rota
@@ -44,6 +91,12 @@ export const apiService = {
   async getCoordenadasCidade(cidade) {
     const response = await api.get(`/coordenadas-cidade/${encodeURIComponent(cidade)}`)
     return response.data
+  },
+  
+  // Obter coordenadas de múltiplas cidades de uma vez
+  async getCoordenadasCidades(cidades) {
+    const response = await api.post('/coordenadas-cidades', { cidades })
+    return response.data.coordenadas
   },
   
   // Obter todas as rotas de uma bitola
