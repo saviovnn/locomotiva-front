@@ -1,6 +1,6 @@
 # Locomotiva Front
 
-Este projeto foi desenvolvido como trabalho da matéria de **Inteligência Artificia I** do professor [Luis Fernando de Almeida](https://buscatextual.cnpq.br/buscatextual/visualizacv.do) na **UNITAU**.
+Este projeto foi desenvolvido como trabalho da matéria de **Inteligência Artificia I** do professor [Luis Fernando de Almeida](https://www.linkedin.com/in/luis-fernando-de-almeida/) na **UNITAU**.
 
 
 ### Tema do Projeto
