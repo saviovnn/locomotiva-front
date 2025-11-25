@@ -11,7 +11,11 @@ Este projeto foi desenvolvido como trabalho da matéria de **Inteligência Artif
 
 Este frontend utiliza os algoritmos de busca em grafos implementados na API para calcular e visualizar as rotas ferroviárias otimizadas. Para mais detalhes sobre os algoritmos disponíveis, consulte a documentação da API.
 
-## DISCLAIMER
+## Demo do Projeto
+
+[![Video](https://img.youtube.com/vi/zYT4hnvumOs/0.jpg)](https://www.youtube.com/watch?v=zYT4hnvumOs)
+
+## Disclaimer
 
 Nem todas as estações vão coincidir exatamente com a rota desenhada no mapa, pode haver uma variação.
 
