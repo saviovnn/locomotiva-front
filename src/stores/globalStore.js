@@ -4,7 +4,7 @@ import { ref, computed } from 'vue'
 export const useGlobalStore = defineStore('global', () => {
   // Estado
   const bitola = ref('Larga')
-  const algoritmo = ref('amplitude')
+  const algoritmo = ref('a_estrela')
   const origem = ref('')
   const destino = ref('')
   const profundidade = ref(20)
